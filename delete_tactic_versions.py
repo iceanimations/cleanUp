@@ -8,11 +8,7 @@ site.addsitedir(r'd:\talha.ahmed\workspace\pyenv_maya\tactic')
 
 import auth.user
 
-# from tactic_client_lib import TacticServerStub
-# server = TacticServerStub()
-
 auth.user.login('tactic', 'tactic123', project='suntop_s01')
-
 
 import app.util as util
 logging.basicConfig(
@@ -37,12 +33,13 @@ def get_sobject_deletables(sobject,
         ]
         max_version = max(csnaps, key=lambda s: s['version'])
         for snap in csnaps:
-            old_by_version = snap['version'] <= max_version['version'] - versions
+            old_by_version = (snap['version'] <=
+                              max_version['version'] - versions)
             old_by_timestamp = ((datetime.now() - datetime.strptime(
                 snap['timestamp'].split('.')[0], '%Y-%m-%d %H:%M:%S')).days >
                                 days)
-            current_or_latest = ((snap['is_current'] and keep_current)
-                                 or (snap['is_latest'] and keep_latest))
+            current_or_latest = ((snap['is_current'] and keep_current) or
+                                 (snap['is_latest'] and keep_latest))
             if old_by_version and old_by_timestamp and not current_or_latest:
                 paths = [
                     util.translatePath(path)
@@ -66,9 +63,7 @@ def delete_from_assets_in_episodes(versions=2,
                                    days=3,
                                    keep_current=True,
                                    keep_latest=True):
-    sobjs = server.eval(
-        "@SOBJECT(vfx/asset.vfx/asset_in_episode)"
-    )
+    sobjs = server.eval("@SOBJECT(vfx/asset.vfx/asset_in_episode)")
     for sobj in sobjs:
         print sobj.get('episode_code'), sobj.get('asset_code')
         for p in get_sobject_deletables(
@@ -84,8 +79,7 @@ def delete_from_assets_in_episodes(versions=2,
 
 def delete_from_assets(versions=2, days=3, keep_current=True,
                        keep_latest=True):
-    sobjs = server.eval(
-        "@SOBJECT(vfx/asset)")
+    sobjs = server.eval("@SOBJECT(vfx/asset)")
     for sobj in sobjs:
         print sobj.get('code')
         for p in get_sobject_deletables(sobj):

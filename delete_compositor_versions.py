@@ -33,29 +33,34 @@ def clean_dir(directory, simulate=False, doprint=True, get_size=True):
     return files_deleted
 
 
+def get_deletable_dirs(dirs, keep_versions=1):
+    version_dirs = []
+    for _dir in dirs:
+        match = version_pattern.match(_dir)
+        if match:
+            version_dirs.append((_dir, int(match.group(1))))
+    return [_dir[0] for _dir in sorted(version_dirs,
+            key=lambda x: x[1], reverse=True)[keep_versions:]]
+
+
 def delete_compositor_versions(
         base_path, simulate=False, doprint=True, get_size=True,
         remove_directories=False, keep_versions=1):
     deleted_files = []
+
     for path, dirs, files in os.walk(base_path):
-        version_dirs = [_dir for _dir in dirs if version_pattern.match(_dir)]
-        if version_dirs:
-            max_dir = max(version_dirs)
-            if doprint:
-                print (path, max_dir)
-            for _dir in version_dirs:
-                if _dir == max_dir:
-                    continue
-                vdir = os.path.join(path, _dir)
-                files = clean_dir(vdir, simulate, doprint)
-                deleted_files.extend(files)
-                if remove_directories:
-                    try:
-                        if simulate:
-                            os.rmdir(vdir)
-                        deleted_files.append((vdir, 0) if get_size else vdir)
-                    except (IOError, WindowsError):
-                        pass
+        del_dirs = get_deletable_dirs(dirs, keep_versions)
+        for _dir in get_deletable_dirs(dirs, keep_versions):
+            vdir = os.path.join(path, _dir)
+            files = clean_dir(vdir, simulate, doprint)
+            deleted_files.extend(files)
+            if remove_directories:
+                try:
+                    if not simulate:
+                        os.rmdir(vdir)
+                    deleted_files.append((vdir, 0) if get_size else vdir)
+                except (IOError, WindowsError):
+                    pass
 
     if get_size:
         print ('Total Size:', calc_size(deleted_files))
