@@ -34,6 +34,7 @@ def clean_dir(directory, simulate=False, doprint=True, get_size=True):
 
 
 def get_deletable_dirs(dirs, keep_versions=1):
+    '''return: list of str'''
     version_dirs = []
     for _dir in dirs:
         match = version_pattern.match(_dir)
@@ -45,12 +46,12 @@ def get_deletable_dirs(dirs, keep_versions=1):
 
 def delete_compositor_versions(
         base_path, simulate=False, doprint=True, get_size=True,
-        remove_directories=False, keep_versions=1):
+        remove_directories=False, keep_versions=1, batfile=None):
     deleted_files = []
 
     for path, dirs, files in os.walk(base_path):
         del_dirs = get_deletable_dirs(dirs, keep_versions)
-        for _dir in get_deletable_dirs(dirs, keep_versions):
+        for _dir in del_dirs:
             vdir = os.path.join(path, _dir)
             files = clean_dir(vdir, simulate, doprint)
             deleted_files.extend(files)
@@ -64,6 +65,8 @@ def delete_compositor_versions(
 
     if get_size:
         print ('Total Size:', calc_size(deleted_files))
+    if batfile:
+        create_bat_file(deleted_files, batfile)
     return deleted_files
 
 
@@ -77,6 +80,17 @@ def calc_size(files):
         else:
             sizes.append(os.path.getsize(_file))
     return sum(sizes)
+
+
+def create_bat_file(files, batfilename):
+    with open(batfilename, 'w+') as batfile:
+        for _file in files:
+            line = '\ndelete %s'
+            if isinstance(_file, tuple) or isinstance(_file, list):
+                line = line % _file[1]
+            else:
+                line = line % _file
+            batfile.write(line)
 
 
 def create_parser():
@@ -98,19 +112,21 @@ def create_parser():
             '--verbose', '-v', action='store_true', help='print file names')
     parser.add_argument(
             '--removedirs', '-r', action='store_true',
-            help='Dont just delete files also delete directories')
+            help='Don\'t just delete files also delete directories')
     parser.add_argument(
             '--getsize', '-z', action='store_true',
             help='print file size and total size of deleted files')
     parser.add_argument(
             '--keepversions', '-k', type=int, default=1,
             help='number of versions to keep')
+    parser.add_argument(
+            '--batfile', '-b', type=int, default=1, help='generate bat file')
     return parser
 
 
-def main():
+def main(args=None):
     parser = create_parser()
-    namespace = parser.parse_args(sys.argv[1:])
+    namespace = parser.parse_args(sys.argv[1:] if args is None else args)
 
     if namespace.basedir is None or not os.path.isdir(namespace.basedir):
         print ('\nError: No Valid directory provided!\n')
@@ -140,7 +156,7 @@ def main():
 
     delete_compositor_versions(
             namespace.basedir, namespace.simulate, namespace.verbose,
-            namespace.getsize, namespace.keepversions)
+            namespace.getsize, namespace.keepversions, namespace.batfilename)
 
 
 if __name__ == "__main__":
