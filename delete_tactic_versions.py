@@ -1,11 +1,12 @@
 from __future__ import print_function
+
 import site
 import logging
 import os
-import subprocess
 import sys
 import argparse
-import sys
+import tempfile
+
 from datetime import datetime
 from del_utils import calc_size, unlink, create_bat_file
 
@@ -52,20 +53,20 @@ def get_sobject_deletables(sobject, versions=2, days=3, keep_current=True,
     return deletables
 
 
-known_stypes = [
-        'vfx/asset', 'vfx/shot', 'vfx/sequences', 'vfx/asset_in_episode']
-
-print_functions {
-        'vfx/asset_in_episode': print_asset_in_episode,
-}
-
-
 def print_asset_in_episode(sobj):
-    print (sobj.episode_code, sobj.asset_code)
+    print (sobj.get('episode_code'), sobj.get('asset_code'))
 
 
 def print_sobj_code(sobj):
-    print (sobj.code)
+    print (sobj.get('code'))
+
+
+known_stypes = [
+        'vfx/asset', 'vfx/shot', 'vfx/sequences', 'vfx/asset_in_episode']
+
+print_functions = {
+        'vfx/asset_in_episode': print_asset_in_episode,
+}
 
 
 def delete_from_stype(
@@ -90,8 +91,9 @@ def delete_from_stype(
 
 
 def create_parser():
-    parser = argparse.ArgumentParser('Delete older versions from Tactic SObjects')
-    parser.add_argument('project', type=str,
+    parser = argparse.ArgumentParser(
+            'Delete older versions from Tactic SObjects')
+    parser.add_argument('project', type=str, default='sthpw',
                         help='The project to purge off older versions')
     parser.add_argument('--stype', '-t', type=str, nargs='+',
                         help='The Search Type to purge of older versions')
@@ -99,14 +101,14 @@ def create_parser():
                         help='Specify a directory to generate a logfile')
     parser.add_argument('--logfile', '-f', type=str, nargs=1,
                         help='Specify a logfile path (Overrides --logdir)')
-    parser.add_argument('--keepversions', '-k', type=int,
+    parser.add_argument('--keepversions', '-kv', type=int, default=2,
                         help='Number of versions to keep')
-    parser.add_argument('--keepdays', '-d', type=int,
+    parser.add_argument('--keepdays', '-kd', type=int, default=3,
                         help='Versions will not be deleted from inside this '
                              'many number of days')
-    parser.add_argument('--keepcurrent', '-c', action='store_true',
+    parser.add_argument('--keepcurrent', '-kc', action='store_true',
                         help='Keep the current versions')
-    parser.add_argument('--keeplatest', '-l', action='store_true',
+    parser.add_argument('--keeplatest', '-kl', action='store_true',
                         help='Keep the latest versions')
     parser.add_argument('--batfile', '-b', type=str,
                         help='Path for a bat file generated')
@@ -119,24 +121,50 @@ def create_parser():
     return parser
 
 
-def delete_tactic_versions(argv=None):
-    parser = create_parser()
-    _ns = parser.parse_args(sys.argv[1:] if args is None else args)
+def delete_tactic_versions(
+        project, stypes=None, versions=2, days=3,
+        keep_current=True, keep_latest=True, print_paths=True,
+        print_sobj=True, simulate=False, getsize=True, batfile=None):
+    if stypes is None:
+        stypes = known_stypes
+    server.set_project(project)
+    deletables = []
+    for _stype in stypes:
+        if print_sobj:
+            print ('SType: ', _stype)
+        _del = delete_from_stype(
+                _stype, versions=versions, days=days,
+                keep_current=keep_current, keep_latest=keep_latest,
+                print_paths=print_paths, simulate=simulate,
+                getsize=getsize)
+        deletables.extend(_del)
 
-    server.set_project(_ns.project if _ns.project else 'sthpw')
-    stypes = _ns.stypes if _ns.stypes else known_stypes
+    if getsize:
+        print ('Total Size:', calc_size(deletables))
+    if batfile:
+        create_bat_file(deletables, batfile)
+
+
+def main(argv=None):
+    parser = create_parser()
+    _ns = parser.parse_args(sys.argv[1:] if argv is None else argv)
+
+    stypes = _ns.stype if _ns.stype else known_stypes
+
+    print ('Project: ', _ns.project)
+    print ('Stypes: ', stypes)
 
     log_dir = tempfile.gettempdir()
 
-    if namespace.logdir and not namespace.logfile:
-        if os.path.isdir(namespace.logdir):
-            log_dir = namespace.logdir
+    if _ns.logdir and not _ns.logfile:
+        if os.path.isdir(_ns.logdir):
+            log_dir = _ns.logdir
         else:
             print ('\nWarning: Directory %s does not exists, using %s\n' % (
-                namespace.logdir, log_dir))
+                _ns.logdir, log_dir))
 
-    if namespace.logfile:
-        logfile = namespace.logfile
+    if _ns.logfile:
+        logfile = _ns.logfile
     else:
         _fd, logfile = tempfile.mkstemp(
                 suffix='.log', prefix='tacticdel_', dir=log_dir, text=True)
@@ -147,22 +175,16 @@ def delete_tactic_versions(argv=None):
 
     print ('Log File: ', logfile)
 
-    deletables = []
-    for _stype in stypes:
-        _del = delete_from_stypes(
-                _stype, versions=_ns.keepversions,
-                days=_ns.keepdays, keep_current=_ns.keepcurrent,
-                keep_latest=_ns.keep_latest, print_paths=_ns.verbose,
-                simulate=_ns.simulate, getsize=_ns.getsize)
-        deletables.extend(_del)
-
-    if _ns.getsize:
-        print ('Total Size:', calc_size(deleted_files))
-    if _ns.batfile:
-        create_bat_file(delete_files, batfile)
-
-    return deletables
+    delete_tactic_versions(
+            _ns.project, stypes, versions=_ns.keepversions,
+            days=_ns.keepdays, keep_current=_ns.keepcurrent,
+            keep_latest=_ns.keeplatest, print_paths=_ns.verbose,
+            simulate=_ns.simulate, getsize=_ns.getsize, batfile=_ns.batfile)
 
 
 if __name__ == "__main__":
-    delete_tactic_versions()
+    try:
+        sys.path.insert(0, os.path.dirname(__file__))
+    except NameError:
+        sys.path.insert(0, '.')
+    main()

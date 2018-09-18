@@ -135,8 +135,12 @@ def main(args=None):
 
     delete_compositor_versions(
             namespace.basedir, namespace.simulate, namespace.verbose,
-            namespace.getsize, namespace.keepversions, namespace.batfilename)
+            namespace.getsize, namespace.keepversions, namespace.batfile)
 
 
 if __name__ == "__main__":
+    try:
+        sys.path.insert(0, os.path.dirname(__file__))
+    except NameError:
+        sys.path.insert(0, '.')
     main()
