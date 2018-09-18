@@ -7,6 +7,8 @@ import tempfile
 import argparse
 import sys
 
+from del_utils import calc_size, unlink, create_bat_file
+
 base_path = (r'\\renders2\Storage\Projects\external\Prince_Choc_5'
              r'\02_production\2D\Output\EP001\Output')
 version_pattern = re.compile('^v(\d+)$')
@@ -19,7 +21,7 @@ def clean_dir(directory, simulate=False, doprint=True, get_size=True):
         if os.path.isfile(_path):
             size = os.path.getsize(_path)
             if not simulate:
-                os.unlink(_path)
+                unlink(_path)
             if doprint:
                 if get_size:
                     print (_path, 'SIZE:', size)
@@ -68,29 +70,6 @@ def delete_compositor_versions(
     if batfile:
         create_bat_file(deleted_files, batfile)
     return deleted_files
-
-
-def calc_size(files):
-    if not files:
-        return 0
-    sizes = []
-    for _file in files:
-        if isinstance(_file, tuple) or isinstance(_file, list):
-            sizes.append(_file[1])
-        else:
-            sizes.append(os.path.getsize(_file))
-    return sum(sizes)
-
-
-def create_bat_file(files, batfilename):
-    with open(batfilename, 'w+') as batfile:
-        for _file in files:
-            line = '\ndelete %s'
-            if isinstance(_file, tuple) or isinstance(_file, list):
-                line = line % _file[1]
-            else:
-                line = line % _file
-            batfile.write(line)
 
 
 def create_parser():
